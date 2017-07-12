@@ -156,9 +156,7 @@ func NewRing(opt *RingOptions) *Ring {
 		clopt.Addr = addr
 		ring.addClient(name, NewClient(clopt))
 	}
-	if opt.MoveShards {
-		go ring.heartbeat()
-	}
+	go ring.heartbeat()
 	return ring
 }
 
@@ -326,7 +324,7 @@ func (c *Ring) heartbeat() {
 
 		c.mu.RUnlock()
 
-		if rebalance {
+		if rebalance && c.opt.MoveShards {
 			c.rebalance()
 		}
 	}
