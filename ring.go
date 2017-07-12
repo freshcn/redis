@@ -238,21 +238,29 @@ func (c *Ring) addClient(name string, cl *Client) {
 func (c *Ring) shardByKey(key string) (*ringShard, error) {
 	key = hashtag.Key(key)
 
-	c.mu.RLock()
+	if c.opt.MoveShards {
+		c.mu.RLock()
+	}
 
 	if c.closed {
-		c.mu.RUnlock()
+		if c.opt.MoveShards {
+			c.mu.RUnlock()
+		}
 		return nil, pool.ErrClosed
 	}
 
 	name := c.hash.Get(key)
 	if name == "" {
-		c.mu.RUnlock()
+		if c.opt.MoveShards {
+			c.mu.RUnlock()
+		}
 		return nil, errRingShardsDown
 	}
 
 	shard := c.shards[name]
-	c.mu.RUnlock()
+	if c.opt.MoveShards {
+		c.mu.RUnlock()
+	}
 	return shard, nil
 }
 
@@ -265,9 +273,13 @@ func (c *Ring) shardByName(name string) (*ringShard, error) {
 		return c.randomShard()
 	}
 
-	c.mu.RLock()
+	if c.opt.MoveShards {
+		c.mu.RLock()
+	}
 	shard := c.shards[name]
-	c.mu.RUnlock()
+	if c.opt.MoveShards {
+		c.mu.RUnlock()
+	}
 	return shard, nil
 }
 
@@ -295,9 +307,14 @@ func (c *Ring) rebalance() {
 		}
 	}
 
-	c.mu.Lock()
+	if c.opt.MoveShards {
+		c.mu.Lock()
+	}
 	c.hash = hash
-	c.mu.Unlock()
+
+	if c.opt.MoveShards {
+		c.mu.Unlock()
+	}
 }
 
 // heartbeat monitors state of each shard in the ring.
@@ -307,10 +324,14 @@ func (c *Ring) heartbeat() {
 	for _ = range ticker.C {
 		var rebalance bool
 
-		c.mu.RLock()
+		if c.opt.MoveShards {
+			c.mu.RLock()
+		}
 
 		if c.closed {
-			c.mu.RUnlock()
+			if c.opt.MoveShards {
+				c.mu.RUnlock()
+			}
 			break
 		}
 
@@ -322,7 +343,9 @@ func (c *Ring) heartbeat() {
 			}
 		}
 
-		c.mu.RUnlock()
+		if c.opt.MoveShards {
+			c.mu.RUnlock()
+		}
 
 		if rebalance && c.opt.MoveShards {
 			c.rebalance()
