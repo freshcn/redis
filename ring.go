@@ -42,6 +42,8 @@ type RingOptions struct {
 	PoolTimeout        time.Duration
 	IdleTimeout        time.Duration
 	IdleCheckFrequency time.Duration
+
+	MoveShards bool
 }
 
 func (opt *RingOptions) init() {
@@ -154,7 +156,9 @@ func NewRing(opt *RingOptions) *Ring {
 		clopt.Addr = addr
 		ring.addClient(name, NewClient(clopt))
 	}
-	go ring.heartbeat()
+	if opt.MoveShards {
+		go ring.heartbeat()
+	}
 	return ring
 }
 
