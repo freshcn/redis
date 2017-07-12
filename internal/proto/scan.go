@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"gopkg.in/redis.v5/internal"
+	"gopkg.in/freshcn/redis.v5/internal"
 )
 
 func Scan(b []byte, v interface{}) error {

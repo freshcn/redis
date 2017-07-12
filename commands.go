@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/redis.v5/internal"
+	"gopkg.in/freshcn/redis.v5/internal"
 )
 
 func readTimeout(timeout time.Duration) time.Duration {

@@ -19,4 +19,4 @@ install:
   - go get github.com/onsi/ginkgo
   - go get github.com/onsi/gomega
   - mkdir -p $HOME/gopath/src/gopkg.in
-  - mv `pwd` $HOME/gopath/src/gopkg.in/redis.v5
+  - mv `pwd` $HOME/gopath/src/gopkg.in/freshcn/redis.v5

@@ -3,7 +3,7 @@
 package redis
 
 import (
-	"gopkg.in/redis.v5/internal/pool"
+	"gopkg.in/freshcn/redis.v5/internal/pool"
 )
 
 type baseClient struct {

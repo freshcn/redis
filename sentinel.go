@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/redis.v5/internal"
-	"gopkg.in/redis.v5/internal/pool"
+	"gopkg.in/freshcn/redis.v5/internal"
+	"gopkg.in/freshcn/redis.v5/internal/pool"
 )
 
 //------------------------------------------------------------------------------

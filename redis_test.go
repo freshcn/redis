@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"gopkg.in/redis.v5"
+	"gopkg.in/freshcn/redis.v5"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

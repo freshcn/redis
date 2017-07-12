@@ -3,34 +3,34 @@
 Supports:
 
 - Redis 3 commands except QUIT, MONITOR, SLOWLOG and SYNC.
-- [Pub/Sub](https://godoc.org/gopkg.in/redis.v5#PubSub).
-- [Transactions](https://godoc.org/gopkg.in/redis.v5#Multi).
-- [Pipeline](https://godoc.org/gopkg.in/redis.v5#example-Client-Pipeline) and [TxPipeline](https://godoc.org/gopkg.in/redis.v5#example-Client-TxPipeline).
-- [Scripting](https://godoc.org/gopkg.in/redis.v5#Script).
-- [Timeouts](https://godoc.org/gopkg.in/redis.v5#Options).
-- [Redis Sentinel](https://godoc.org/gopkg.in/redis.v5#NewFailoverClient).
-- [Redis Cluster](https://godoc.org/gopkg.in/redis.v5#NewClusterClient).
-- [Ring](https://godoc.org/gopkg.in/redis.v5#NewRing).
-- [Instrumentation](https://godoc.org/gopkg.in/redis.v5#ex-package--Instrumentation).
+- [Pub/Sub](https://godoc.org/gopkg.in/freshcn/redis.v5#PubSub).
+- [Transactions](https://godoc.org/gopkg.in/freshcn/redis.v5#Multi).
+- [Pipeline](https://godoc.org/gopkg.in/freshcn/redis.v5#example-Client-Pipeline) and [TxPipeline](https://godoc.org/gopkg.in/freshcn/redis.v5#example-Client-TxPipeline).
+- [Scripting](https://godoc.org/gopkg.in/freshcn/redis.v5#Script).
+- [Timeouts](https://godoc.org/gopkg.in/freshcn/redis.v5#Options).
+- [Redis Sentinel](https://godoc.org/gopkg.in/freshcn/redis.v5#NewFailoverClient).
+- [Redis Cluster](https://godoc.org/gopkg.in/freshcn/redis.v5#NewClusterClient).
+- [Ring](https://godoc.org/gopkg.in/freshcn/redis.v5#NewRing).
+- [Instrumentation](https://godoc.org/gopkg.in/freshcn/redis.v5#ex-package--Instrumentation).
 - [Cache friendly](https://github.com/go-redis/cache).
 - [Rate limiting](https://github.com/go-redis/rate).
 - [Distributed Locks](https://github.com/bsm/redis-lock).
 
-API docs: https://godoc.org/gopkg.in/redis.v5.
-Examples: https://godoc.org/gopkg.in/redis.v5#pkg-examples.
+API docs: https://godoc.org/gopkg.in/freshcn/redis.v5.
+Examples: https://godoc.org/gopkg.in/freshcn/redis.v5#pkg-examples.
 
 ## Installation
 
 Install:
 
 ```shell
-go get gopkg.in/redis.v5
+go get gopkg.in/freshcn/redis.v5
 ```
 
 Import:
 
 ```go
-import "gopkg.in/redis.v5"
+import "gopkg.in/freshcn/redis.v5"
 ```
 
 ## Quickstart
@@ -75,7 +75,7 @@ func ExampleClient() {
 
 ## Howto
 
-Please go through [examples](https://godoc.org/gopkg.in/redis.v5#pkg-examples) to get an idea how to use this package.
+Please go through [examples](https://godoc.org/gopkg.in/freshcn/redis.v5#pkg-examples) to get an idea how to use this package.
 
 ## Look and feel
 

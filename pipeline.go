@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"gopkg.in/redis.v5/internal/pool"
+	"gopkg.in/freshcn/redis.v5/internal/pool"
 )
 
 type pipelineExecer func([]Cmder) error
