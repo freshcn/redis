@@ -302,19 +302,15 @@ func (c *Ring) Process(cmd Cmder) error {
 func (c *Ring) rebalance() {
 	hash := consistenthash.New(c.nreplicas, nil)
 	for name, shard := range c.shards {
-		if shard.IsUp() {
+		if shard.IsUp() || !c.opt.MoveShards {
 			hash.Add(name)
 		}
 	}
 
-	if c.opt.MoveShards {
-		c.mu.Lock()
-	}
+	c.mu.Lock()
 	c.hash = hash
 
-	if c.opt.MoveShards {
-		c.mu.Unlock()
-	}
+	c.mu.Unlock()
 }
 
 // heartbeat monitors state of each shard in the ring.
@@ -347,7 +343,7 @@ func (c *Ring) heartbeat() {
 			c.mu.RUnlock()
 		}
 
-		if rebalance && c.opt.MoveShards {
+		if rebalance {
 			c.rebalance()
 		}
 	}
