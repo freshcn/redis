@@ -57,10 +57,20 @@ func ExampleNewClusterClient() {
 func ExampleNewRing() {
 	client := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
-			"shard1": ":7000",
-			"shard2": ":7001",
-			"shard3": ":7002",
+			"s1": ":6379",
+			"s2": ":6380",
+			"s3": ":6381",
 		},
+		Weights: map[string]int{ // 配置节点权重，取值范围 (0, 100]
+			"s1": 100,
+			"s2": 50,
+			"s3": 60,
+		},
+		PollMode:           true, // 启用轮询模式, 权重会影响每个节点的轮询次数
+		MoveShards:         true, // 开启节点剔除
+		DB:                 0,
+		Password:           "",
+		HeartbeatFrequency: time.Millisecond * 10,
 	})
 	client.Ping()
 }
