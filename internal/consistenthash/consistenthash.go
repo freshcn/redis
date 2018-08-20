@@ -50,6 +50,18 @@ func (m *Map) IsEmpty() bool {
 }
 
 // Adds some keys to the hash.
+func (m *Map) AddWithReplicas(replicas int, keys ...string) {
+	for _, key := range keys {
+		for i := 0; i < replicas; i++ {
+			hash := int(m.hash([]byte(strconv.Itoa(i) + key)))
+			m.keys = append(m.keys, hash)
+			m.hashMap[hash] = key
+		}
+	}
+	sort.Ints(m.keys)
+}
+
+// Adds some keys to the hash.
 func (m *Map) Add(keys ...string) {
 	for _, key := range keys {
 		for i := 0; i < m.replicas; i++ {

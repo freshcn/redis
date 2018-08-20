@@ -3,6 +3,7 @@ package redis
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -15,6 +16,13 @@ import (
 	"gopkg.in/freshcn/redis.v5/internal/pool"
 )
 
+type AddrWeight struct {
+	Addr   string
+	Weight uint8
+}
+
+const nreplicas = 100
+
 var errRingShardsDown = errors.New("redis: all ring shards are down")
 
 // RingOptions are used to configure a ring client and should be
@@ -22,6 +30,24 @@ var errRingShardsDown = errors.New("redis: all ring shards are down")
 type RingOptions struct {
 	// Map of name => host:port addresses of ring shards.
 	Addrs map[string]string
+
+	// Map of name => Weight of ring shards.
+	// 如果某addr的weights不存在，则默认为nreplicas
+	// Weight取值范围(0,nreplicas]
+	Weights map[string]int
+
+	// if true: 轮流使用ring shards，而不是通过consistenthash方式
+	// if false: 使用consistenthash方式
+	// 轮询模式也会根据权重来轮询
+	PollMode bool
+
+	namesLocker sync.RWMutex
+	names       []string
+	index       uint32
+
+	// if true: 会自动剔除坏节点
+	// if false: 不会自动剔除坏节点
+	MoveShards bool
 
 	// Frequency of PING commands sent to check shards availability.
 	// Shard is considered down after 3 subsequent failed checks.
@@ -42,14 +68,74 @@ type RingOptions struct {
 	PoolTimeout        time.Duration
 	IdleTimeout        time.Duration
 	IdleCheckFrequency time.Duration
-
-	MoveShards bool
 }
 
 func (opt *RingOptions) init() {
 	if opt.HeartbeatFrequency == 0 {
 		opt.HeartbeatFrequency = 500 * time.Millisecond
 	}
+
+	opt.makeWeightLegal()
+	opt.setNames(makeNames(opt.Weights))
+	opt.index = 0
+}
+
+func (opt *RingOptions) makeWeightLegal() {
+	// 去除不存在的name
+	for name := range opt.Weights {
+		if _, ok := opt.Addrs[name]; !ok {
+			delete(opt.Weights, name)
+		}
+	}
+
+	// 规范数据大小
+	max := 0
+	for name := range opt.Addrs {
+		var w int
+		var ok bool
+		if w, ok = opt.Weights[name]; ok {
+			if w <= 0 {
+				// 小于等于0的节点放弃
+				delete(opt.Weights, name)
+				continue
+			} else if w > nreplicas {
+				w = nreplicas
+			}
+		} else {
+			// 未配置，默认为nreplicas
+			w = nreplicas
+		}
+		opt.Weights[name] = w
+		if w > max {
+			max = w
+		}
+	}
+
+	// 最大权重提到nreplicas
+	// 其它权重同比例提升
+	// poll模式不需要提升，因为虚拟节点不起效
+	if opt.PollMode && max < nreplicas {
+		factor := float64(nreplicas) / float64(max)
+		for name, w := range opt.Weights {
+			opt.Weights[name] = int(math.Floor(factor*float64(w) + 0.5))
+		}
+	}
+}
+
+func (opt *RingOptions) setNames(names []string) {
+	opt.namesLocker.Lock()
+	opt.names = names
+	opt.namesLocker.Unlock()
+}
+
+func (opt *RingOptions) nextNames() string {
+	next := atomic.AddUint32(&opt.index, 1)
+	opt.namesLocker.RLock()
+	defer opt.namesLocker.RUnlock()
+	if len(opt.names) == 0 {
+		return ""
+	}
+	return opt.names[int(next)%len(opt.names)]
 }
 
 func (opt *RingOptions) clientOptions() *Options {
@@ -84,7 +170,7 @@ func (shard *ringShard) String() string {
 }
 
 func (shard *ringShard) IsDown() bool {
-	const threshold = 3
+	const threshold = 2
 	return atomic.LoadInt32(&shard.down) >= threshold
 }
 
@@ -139,7 +225,6 @@ type Ring struct {
 }
 
 func NewRing(opt *RingOptions) *Ring {
-	const nreplicas = 100
 	opt.init()
 	ring := &Ring{
 		opt:       opt,
@@ -151,10 +236,11 @@ func NewRing(opt *RingOptions) *Ring {
 		cmdsInfoOnce: new(sync.Once),
 	}
 	ring.cmdable.process = ring.Process
+
 	for name, addr := range opt.Addrs {
 		clopt := opt.clientOptions()
 		clopt.Addr = addr
-		ring.addClient(name, NewClient(clopt))
+		ring.addClientWithWeight(opt.Weights[name], name, NewClient(clopt))
 	}
 	go ring.heartbeat()
 	return ring
@@ -235,6 +321,13 @@ func (c *Ring) addClient(name string, cl *Client) {
 	c.mu.Unlock()
 }
 
+func (c *Ring) addClientWithWeight(weight int, name string, cl *Client) {
+	c.mu.Lock()
+	c.hash.AddWithReplicas(weight, name)
+	c.shards[name] = &ringShard{Client: cl}
+	c.mu.Unlock()
+}
+
 func (c *Ring) shardByKey(key string) (*ringShard, error) {
 	key = hashtag.Key(key)
 
@@ -257,6 +350,8 @@ func (c *Ring) shardByKey(key string) (*ringShard, error) {
 		return nil, errRingShardsDown
 	}
 
+	fmt.Println("nextShard", name)
+
 	shard := c.shards[name]
 	if c.opt.MoveShards {
 		c.mu.RUnlock()
@@ -266,6 +361,15 @@ func (c *Ring) shardByKey(key string) (*ringShard, error) {
 
 func (c *Ring) randomShard() (*ringShard, error) {
 	return c.shardByKey(strconv.Itoa(rand.Int()))
+}
+
+func (c *Ring) nextShard() (*ringShard, error) {
+	name := c.opt.nextNames()
+	if name == "" {
+		return nil, errRingShardsDown
+	}
+	fmt.Println("nextShard", name)
+	return c.shardByName(name)
 }
 
 func (c *Ring) shardByName(name string) (*ringShard, error) {
@@ -289,8 +393,15 @@ func (c *Ring) cmdShard(cmd Cmder) (*ringShard, error) {
 	return c.shardByKey(firstKey)
 }
 
-func (c *Ring) Process(cmd Cmder) error {
-	shard, err := c.cmdShard(cmd)
+func (c *Ring) Process(cmd Cmder) (e error) {
+	var shard *ringShard
+	var err error
+	if c.opt.PollMode {
+		// 轮询模式
+		shard, err = c.nextShard()
+	} else {
+		shard, err = c.cmdShard(cmd)
+	}
 	if err != nil {
 		cmd.setErr(err)
 		return err
@@ -301,15 +412,16 @@ func (c *Ring) Process(cmd Cmder) error {
 // rebalance removes dead shards from the Ring.
 func (c *Ring) rebalance() {
 	hash := consistenthash.New(c.nreplicas, nil)
+	n2w := map[string]int{}
 	for name, shard := range c.shards {
 		if shard.IsUp() || !c.opt.MoveShards {
-			hash.Add(name)
+			n2w[name] = c.opt.Weights[name]
+			hash.AddWithReplicas(c.opt.Weights[name], name)
 		}
 	}
-
+	c.opt.setNames(makeNames(n2w))
 	c.mu.Lock()
 	c.hash = hash
-
 	c.mu.Unlock()
 }
 
@@ -390,10 +502,16 @@ func (c *Ring) Pipelined(fn func(*Pipeline) error) ([]Cmder, error) {
 func (c *Ring) pipelineExec(cmds []Cmder) (firstErr error) {
 	cmdsMap := make(map[string][]Cmder)
 	for _, cmd := range cmds {
-		cmdInfo := c.cmdInfo(cmd.name())
-		name := cmd.arg(cmdFirstKeyPos(cmd, cmdInfo))
-		if name != "" {
-			name = c.hash.Get(hashtag.Key(name))
+		var name string
+		if c.opt.PollMode {
+			// 轮询
+			name = c.opt.nextNames()
+		} else {
+			cmdInfo := c.cmdInfo(cmd.name())
+			name = cmd.arg(cmdFirstKeyPos(cmd, cmdInfo))
+			if name != "" {
+				name = c.hash.Get(hashtag.Key(name))
+			}
 		}
 		cmdsMap[name] = append(cmdsMap[name], cmd)
 	}
@@ -443,4 +561,53 @@ func (c *Ring) pipelineExec(cmds []Cmder) (firstErr error) {
 	}
 
 	return firstErr
+}
+
+// makeNames 通过权重，获取name的随机队列
+func makeNames(n2w map[string]int) []string {
+	// 求出所有数的最大公约数gcd
+	first := true
+	g := 0
+	for _, w := range n2w {
+		if first {
+			g = w
+			first = false
+			continue
+		}
+		g = gcd(g, w)
+		if g <= 1 {
+			// 不需要再求，直接跳出
+			break
+		}
+	}
+	if g < 1 {
+		g = 1
+	}
+
+	// 每个name有n/gcd个，组成一个共同的数组
+	names := []string{}
+	for name, w := range n2w {
+		for i := 0; i < w/g; i++ {
+			names = append(names, name)
+		}
+	}
+
+	// 数组乱序
+	rand.Seed(time.Now().Unix())
+	for last := len(names) - 1; last > 0; last-- {
+		num := rand.Intn(last)
+		names[last], names[num] = names[num], names[last]
+	}
+	return names
+}
+
+func gcd(i, j int) int {
+	// 最大公约数
+	if i < j {
+		i, j = j, i
+	}
+	if j == 0 {
+		return i
+	}
+	return gcd(j, i%j)
 }
