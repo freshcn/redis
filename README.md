@@ -13,8 +13,7 @@ Examples: https://godoc.org/gopkg.in/freshcn/redis.v5#pkg-examples.
 Install:
 
 ```shell
-go get -u -v gitee.com/JMArch/redis.v5
-mv $GOPARH/src/gitee.com/JMArch/redis.v5 $GOPARH/src/gopkg.in/freshcn/redis.v5
+go get -u -v gopkg.in/freshcn/redis.v5
 ```
 
 Import:
