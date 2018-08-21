@@ -350,8 +350,6 @@ func (c *Ring) shardByKey(key string) (*ringShard, error) {
 		return nil, errRingShardsDown
 	}
 
-	fmt.Println("nextShard", name)
-
 	shard := c.shards[name]
 	if c.opt.MoveShards {
 		c.mu.RUnlock()
@@ -368,7 +366,6 @@ func (c *Ring) nextShard() (*ringShard, error) {
 	if name == "" {
 		return nil, errRingShardsDown
 	}
-	fmt.Println("nextShard", name)
 	return c.shardByName(name)
 }
 
