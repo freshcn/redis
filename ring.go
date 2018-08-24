@@ -16,11 +16,6 @@ import (
 	"gopkg.in/freshcn/redis.v5/internal/pool"
 )
 
-type AddrWeight struct {
-	Addr   string
-	Weight uint8
-}
-
 const nreplicas = 100
 
 var errRingShardsDown = errors.New("redis: all ring shards are down")
