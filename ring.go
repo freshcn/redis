@@ -390,7 +390,7 @@ func (c *Ring) Process(cmd Cmder) (e error) {
 	var err error
 
 	// 轮询模式
-	for i := 0; i < 8*threshold; i++ {
+	for i := 0; i < 16*threshold; i++ {
 		if c.opt.PollMode {
 			shard, err = c.nextShard()
 		} else {
