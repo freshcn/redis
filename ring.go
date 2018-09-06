@@ -16,6 +16,7 @@ import (
 	"gopkg.in/freshcn/redis.v5/internal/pool"
 )
 
+const threshold = 2
 const nreplicas = 100
 
 var errRingShardsDown = errors.New("redis: all ring shards are down")
@@ -165,7 +166,6 @@ func (shard *ringShard) String() string {
 }
 
 func (shard *ringShard) IsDown() bool {
-	const threshold = 2
 	return atomic.LoadInt32(&shard.down) >= threshold
 }
 
@@ -388,17 +388,27 @@ func (c *Ring) cmdShard(cmd Cmder) (*ringShard, error) {
 func (c *Ring) Process(cmd Cmder) (e error) {
 	var shard *ringShard
 	var err error
-	if c.opt.PollMode {
-		// 轮询模式
-		shard, err = c.nextShard()
-	} else {
-		shard, err = c.cmdShard(cmd)
+
+	// 轮询模式
+	for i := 0; i < 8*threshold; i++ {
+		if c.opt.PollMode {
+			shard, err = c.nextShard()
+		} else {
+			shard, err = c.cmdShard(cmd)
+		}
+		if err != nil {
+			cmd.setErr(err)
+			break
+		}
+		err = shard.Client.Process(cmd)
+		if err == nil || err == Nil {
+			break
+		}
+		if shard.Vote(false) {
+			c.rebalance()
+		}
 	}
-	if err != nil {
-		cmd.setErr(err)
-		return err
-	}
-	return shard.Client.Process(cmd)
+	return err
 }
 
 // rebalance removes dead shards from the Ring.
@@ -419,7 +429,7 @@ func (c *Ring) rebalance() {
 
 // heartbeat monitors state of each shard in the ring.
 func (c *Ring) heartbeat() {
-	ticker := time.NewTicker(c.opt.HeartbeatFrequency)
+	ticker := time.NewTicker(time.Millisecond * 500)
 	defer ticker.Stop()
 	for _ = range ticker.C {
 		var rebalance bool
