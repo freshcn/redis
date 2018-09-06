@@ -16,7 +16,7 @@ import (
 	"gopkg.in/freshcn/redis.v5/internal/pool"
 )
 
-const threshold = 2
+const threshold = 3
 const nreplicas = 100
 
 var errRingShardsDown = errors.New("redis: all ring shards are down")
